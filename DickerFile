@@ -13,3 +13,44 @@ COPY target/demo-0.0.1-SNAPSHOT.jar app.jar
 
 # Run the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
+
+
+
+# Start with the OpenJDK 17 Alpine base image
+FROM openjdk:17-alpine3.14
+
+# Install necessary packages
+RUN apk update && \
+    apk add --no-cache \
+    bash \
+    curl \
+    python3 \
+    py3-crcmod \
+    gnupg
+
+# Install Google Cloud SDK
+ENV CLOUD_SDK_VERSION=400.0.0
+
+RUN curl -o /google-cloud-sdk.tar.gz https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${CLOUD_SDK_VERSION}-linux-x86_64.tar.gz && \
+    tar -xzf /google-cloud-sdk.tar.gz -C /opt && \
+    rm /google-cloud-sdk.tar.gz && \
+    /opt/google-cloud-sdk/install.sh
+
+# Set environment variables for Google Cloud SDK
+ENV PATH=$PATH:/opt/google-cloud-sdk/bin
+
+# Verify installation
+RUN gcloud --version
+
+# Copy your application code
+COPY . /app
+
+# Set the working directory
+WORKDIR /app
+
+# Build your application (if needed, for example using Maven or Gradle)
+# RUN ./mvnw package
+
+# Specify the command to run your application (update this based on your actual setup)
+CMD ["java", "-jar", "your-application.jar"]
+
