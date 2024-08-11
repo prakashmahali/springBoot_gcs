@@ -1,0 +1,26 @@
+# Use an official OpenJDK runtime as a parent image
+FROM openjdk:17-slim
+
+# Install necessary tools (if needed)
+RUN apt-get update && apt-get install -y shadow && rm -rf /var/lib/apt/lists/*
+
+# Create a group and user named 'sftservice' with specific UID and GID
+RUN groupadd -r sftservice && useradd -u 1001 -r -g sftservice -m -d /home/sftservice -s /bin/bash sftservice
+
+# Set the working directory to /app
+WORKDIR /app
+
+# Copy the Spring Boot application JAR file into the container
+COPY target/your-springboot-app.jar /app/your-springboot-app.jar
+
+# Change the ownership of the /app directory to sftservice
+RUN chown -R sftservice:sftservice /app
+
+# Switch to the sftservice user
+USER sftservice
+
+# Expose the port on which the application will run (optional)
+EXPOSE 8080
+
+# Command to run the Spring Boot application
+ENTRYPOINT ["java", "-jar", "/app/your-springboot-app.jar"]
