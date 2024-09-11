@@ -1,3 +1,49 @@
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import javax.mail.MessagingException;
+import javax.mail.internet.MimeMessage;
+
+public void sendEmailWithAttachment(String fileName) throws MessagingException {
+    MimeMessage message = mailSender.createMimeMessage();
+    MimeMessageHelper helper = new MimeMessageHelper(message, true);
+    
+    helper.setTo("recipient@example.com");
+    helper.setSubject("SFTP File Transfer Successful");
+    helper.setText("<html><body><h3>SFTP Transfer Complete</h3><p>File: " + fileName + " has been successfully transferred.</p></body></html>", true);
+    
+    mailSender.send(message);
+}
+
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+@Component
+public class SftpTaskScheduler {
+
+    @Scheduled(fixedRate = 3600000)  // Every hour
+    public void performScheduledTask() {
+        List<File> directories = getDirectoriesWithDateFormat("/app/");
+        for (File dir : directories) {
+            try {
+                mergeAndZipFiles(dir);
+                File zipFile = new File(dir.getAbsolutePath() + ".zip");
+                sftpFile(zipFile, "/remote/directory/");
+                sendEmailWithAttachment(zipFile.getName());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
