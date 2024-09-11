@@ -1,164 +1,91 @@
-import java.io.IOException;
-import java.nio.file.*;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
 
-public class DirectoryProcessor {
-
-    private static final String BASE_DIR = "/app/";
-
-    public List<Path> getDirectories() throws IOException {
-        // Pattern to match yyyymmdd directory names
-        Pattern pattern = Pattern.compile("\\d{8}");
-
-        // Get directories matching the pattern
-        return Files.list(Paths.get(BASE_DIR))
-                .filter(Files::isDirectory)
-                .filter(path -> pattern.matcher(path.getFileName().toString()).matches())
-                .collect(Collectors.toList());
-    }
-}
 import java.io.*;
 import java.nio.file.*;
-import java.util.List;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Properties;
+import java.util.Vector;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
-public class FileMerger {
+@Service
+public class DirectoryProcessorService {
 
-    public void mergeFiles(Path dir, String mergedFileName) throws IOException {
-        File mergedFile = new File(dir.toString(), mergedFileName);
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(mergedFile))) {
-            Files.list(dir)
-                .filter(Files::isRegularFile)
-                .forEach(file -> {
-                    try (BufferedReader reader = new BufferedReader(new FileReader(file.toFile()))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            writer.write(line);
-                            writer.newLine();
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                });
-        }
-    }
-}
-import java.io.*;
-import java.nio.file.*;
-import java.util.zip.*;
+    private static final String BASE_DIR = "/app"; // Change this to your base directory
+    private static final String ZIP_DIR = "/app/zipped"; // Where zipped files will be saved
+    private static final String SFTP_HOST = "remote-server.com";
+    private static final int SFTP_PORT = 22;
+    private static final String SFTP_USER = "your-username";
+    private static final String SFTP_PRIVATE_KEY = "/path/to/id_rsa";
 
-public class Zipper {
+    @Scheduled(cron = "0 0 * * * ?") // Every hour
+    public void processDirectories() throws Exception {
+        File baseDir = new File(BASE_DIR);
+        File[] directories = baseDir.listFiles(File::isDirectory);
 
-    public void zipFile(Path sourceFile, Path targetZip) throws IOException {
-        try (FileOutputStream fos = new FileOutputStream(targetZip.toFile());
-             ZipOutputStream zipOut = new ZipOutputStream(fos)) {
-            File fileToZip = sourceFile.toFile();
-            try (FileInputStream fis = new FileInputStream(fileToZip)) {
-                ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
-                zipOut.putNextEntry(zipEntry);
-                
-                byte[] bytes = new byte[1024];
-                int length;
-                while ((length = fis.read(bytes)) >= 0) {
-                    zipOut.write(bytes, 0, length);
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd");
+        String currentDate = dateFormat.format(new Date());
+
+        if (directories != null) {
+            for (File directory : directories) {
+                if (directory.getName().matches("\\d{8}")) { // Matches yyyymmdd format
+                    mergeAndZipFiles(directory);
+                    sftpFile(directory.getName());
                 }
             }
         }
     }
-}
-<dependency>
-    <groupId>com.jcraft</groupId>
-    <artifactId>jsch</artifactId>
-    <version>0.1.55</version>
-</dependency>
 
-  import com.jcraft.jsch.ChannelSftp;
-import com.jcraft.jsch.JSch;
-import com.jcraft.jsch.Session;
+    private void mergeAndZipFiles(File directory) throws IOException {
+        File zipOutput = new File(ZIP_DIR, directory.getName() + ".zip");
+        try (ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(zipOutput))) {
+            File[] files = directory.listFiles();
 
-import java.io.FileInputStream;
-import java.util.Properties;
+            if (files != null) {
+                for (File file : files) {
+                    zipFile(file, zipOut);
+                }
+            }
+        }
+    }
 
-public class SftpUploader {
+    private void zipFile(File file, ZipOutputStream zipOut) throws IOException {
+        try (FileInputStream fis = new FileInputStream(file)) {
+            ZipEntry zipEntry = new ZipEntry(file.getName());
+            zipOut.putNextEntry(zipEntry);
 
-    public void uploadFile(String localFilePath, String remoteDir, String remoteHost, String username, String password) throws Exception {
+            byte[] bytes = new byte[1024];
+            int length;
+            while ((length = fis.read(bytes)) >= 0) {
+                zipOut.write(bytes, 0, length);
+            }
+        }
+    }
+
+    private void sftpFile(String directoryName) throws Exception {
         JSch jsch = new JSch();
-        Session session = jsch.getSession(username, remoteHost, 22);
-        session.setPassword(password);
+        jsch.addIdentity(SFTP_PRIVATE_KEY);
 
+        Session session = jsch.getSession(SFTP_USER, SFTP_HOST, SFTP_PORT);
         Properties config = new Properties();
         config.put("StrictHostKeyChecking", "no");
         session.setConfig(config);
-
         session.connect();
 
         ChannelSftp channelSftp = (ChannelSftp) session.openChannel("sftp");
         channelSftp.connect();
 
-        try (FileInputStream fis = new FileInputStream(localFilePath)) {
-            channelSftp.put(fis, remoteDir + "/" + new File(localFilePath).getName());
+        File zipFile = new File(ZIP_DIR + "/" + directoryName + ".zip");
+        try (FileInputStream fis = new FileInputStream(zipFile)) {
+            channelSftp.put(fis, "/remote/path/" + zipFile.getName());
         }
 
         channelSftp.disconnect();
         session.disconnect();
     }
 }
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.scheduling.annotation.EnableScheduling;
-
-@SpringBootApplication
-@EnableScheduling
-public class MyApp {
-    public static void main(String[] args) {
-        SpringApplication.run(MyApp.class, args);
-    }
-}
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
-
-@Service
-public class DirectoryTaskScheduler {
-
-    private final DirectoryProcessor directoryProcessor = new DirectoryProcessor();
-    private final FileMerger fileMerger = new FileMerger();
-    private final Zipper zipper = new Zipper();
-    private final SftpUploader sftpUploader = new SftpUploader();
-
-    @Scheduled(fixedRate = 3600000) // Runs every 1 hour
-    public void processDirectories() {
-        try {
-            List<Path> directories = directoryProcessor.getDirectories();
-
-            for (Path dir : directories) {
-                String mergedFileName = "merged_" + dir.getFileName().toString() + ".txt";
-                String zipFileName = "merged_" + dir.getFileName().toString() + ".zip";
-
-                // Merge files
-                fileMerger.mergeFiles(dir, mergedFileName);
-
-                // Zip merged file
-                Path mergedFilePath = Paths.get(dir.toString(), mergedFileName);
-                Path zipFilePath = Paths.get(dir.toString(), zipFileName);
-                zipper.zipFile(mergedFilePath, zipFilePath);
-
-                // SFTP zip file
-                String remoteDir = "/remote/dir";
-                String remoteHost = "remote.host.com";
-                String username = "sftpUser";
-                String password = "sftpPassword";
-
-                sftpUploader.uploadFile(zipFilePath.toString(), remoteDir, remoteHost, username, password);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-}
-sftp.remote.host=remote.host.com
-sftp.remote.username=sftpUser
-sftp.remote.password=sftpPassword
-sftp.remote.dir=/remote/dir
