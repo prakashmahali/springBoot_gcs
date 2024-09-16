@@ -1,0 +1,65 @@
+import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
+public void clearFoldersUnderTmp() throws IOException {
+    Path tmpPath = Paths.get("/tmp");
+
+    Files.walkFileTree(tmpPath, new SimpleFileVisitor<Path>() {
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+            Files.delete(file);
+            return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+            String dirName = dir.getFileName().toString();
+            if (dirName.matches("\\d{8}")) {  // Regex for yyyymmdd format
+                Files.delete(dir);
+            }
+            return FileVisitResult.CONTINUE;
+        }
+    });
+}
+public void clearFilesUnderE911() throws IOException {
+    Path e911Path = Paths.get("/tmp1/e911");
+
+    Files.walk(e911Path)
+         .filter(Files::isRegularFile)
+         .forEach(file -> {
+             try {
+                 Files.delete(file);
+             } catch (IOException e) {
+                 e.printStackTrace();
+             }
+         });
+}
+public void copyFilesFromInputToTmp() throws IOException {
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+    String dateFolder = LocalDate.now().format(formatter); // Get current date in yyyymmdd format
+    Path inputPath = Paths.get("/input", dateFolder);
+    Path tmpPath = Paths.get("/tmp", dateFolder);
+
+    if (!Files.exists(tmpPath)) {
+        Files.createDirectories(tmpPath);
+    }
+
+    Files.walk(inputPath)
+         .filter(Files::isRegularFile)
+         .forEach(sourcePath -> {
+             Path destinationPath = tmpPath.resolve(inputPath.relativize(sourcePath));
+             try {
+                 Files.copy(sourcePath, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+             } catch (IOException e) {
+                 e.printStackTrace();
+             }
+         });
+}
+public void processFiles() throws IOException {
+    clearFoldersUnderTmp();
+    clearFilesUnderE911();
+    copyFilesFromInputToTmp();
+}
