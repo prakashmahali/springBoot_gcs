@@ -1,0 +1,68 @@
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Service
+public class EmailService {
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    public String sendEmail() {
+        String url = "https://vznet.com:800/email"; // Node.js API URL
+
+        // Create the request body as a Map
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("sender", "prakash.mahali@gmail.com");
+        requestBody.put("to", new String[]{"prakash.mahali@gmail.com"});
+        requestBody.put("subject", "UAT TESTING");
+        requestBody.put("html", true);
+
+        // Set up headers
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // Wrap the request body and headers in an HttpEntity
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        // Send POST request
+        return restTemplate.exchange(url, HttpMethod.POST, entity, String.class).getBody();
+    }
+}
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class EmailController {
+
+    @Autowired
+    private EmailService emailService;
+
+    @GetMapping("/send-email")
+    public String sendEmail() {
+        return emailService.sendEmail();
+    }
+}
+@Service
+public class EmailService {
+    private final RestTemplate restTemplate;
+
+    @Autowired
+    public EmailService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    // Method to send email
+}
+
+
