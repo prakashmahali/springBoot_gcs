@@ -1,0 +1,46 @@
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Service
+public class EmailService {
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    public String sendEmail() {
+        String url = "https://vznet.com:800/email";
+
+        // Create the request body (data)
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("sender", "prakash.mahali@gmail.com");
+        requestBody.put("to", new String[]{"prakash.mahali@gmail.com"});
+        requestBody.put("subject", "UAT TESTING");
+        requestBody.put("html", true);
+
+        // Set headers
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Content-Type", "application/json");
+
+        // Create HttpEntity containing headers and body
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
+
+        // Make the POST request
+        ResponseEntity<String> response = restTemplate.exchange(
+                url, HttpMethod.POST, request, String.class);
+
+        if (response.getStatusCode() == HttpStatus.OK) {
+            return "Email sent successfully: " + response.getBody();
+        } else {
+            return "Failed to send email: " + response.getStatusCode();
+        }
+    }
+}
