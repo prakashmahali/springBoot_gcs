@@ -1,0 +1,42 @@
+package com.example.slackbot.controller;
+
+import com.example.slackbot.service.SlackService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class package com.example.slackbot.controller;
+
+import com.example.slackbot.service.SlackService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class SlackController {
+
+    @Autowired
+    private SlackService slackService;
+
+    @GetMapping("/send")
+    public String sendSlackMessage() {
+        String channel = "#QA";  // Replace with your actual channel name
+        String message = "Hi";
+        slackService.sendMessage(channel, message);
+        return "Message sent to Slack channel " + channel;
+    }
+}
+ {
+
+    @Autowired
+    private SlackService slackService;
+
+    @GetMapping("/send")
+    public String sendSlackMessage() {
+        String channel = "#QA";  // Replace with your actual channel name
+        String message = "Hi";
+        slackService.sendMessage(channel, message);
+        return "Message sent to Slack channel " + channel;
+    }
+}
