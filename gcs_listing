@@ -1,0 +1,54 @@
+import org.springframework.stereotype.Service;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+
+@Service
+public class GcsDirectoryService {
+
+    // Regular expression to match directories in yyyymmdd format
+    private static final Pattern DATE_PATTERN = Pattern.compile("\\d{8}");
+
+    public List<String> listDirectories(String bucketName) {
+        List<String> directories = new ArrayList<>();
+
+        try {
+            // Run the gsutil ls command
+            ProcessBuilder processBuilder = new ProcessBuilder("gsutil", "ls", "-d", "gs://" + bucketName + "/*");
+            Process process = processBuilder.start();
+
+            // Read the output using BufferedReader
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // Extract the directory name from the GCS path
+                String directoryName = extractDirectoryName(line);
+                
+                // Filter for yyyymmdd format and ignore *_done
+                if (isValidDirectory(directoryName)) {
+                    directories.add(directoryName);
+                }
+            }
+
+            // Wait for the process to finish
+            process.waitFor();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return directories;
+    }
+
+    // Method to extract the directory name from the GCS path
+    private String extractDirectoryName(String gcsPath) {
+        String[] parts = gcsPath.split("/");
+        return parts[parts.length - 1];
+    }
+
+    // Method to check if the directory name is in yyyymmdd format and does not end with _done
+    private boolean isValidDirectory(String directoryName) {
+        return DATE_PATTERN.matcher(directoryName).matches() && !directoryName.endsWith("_done");
+    }
+}
