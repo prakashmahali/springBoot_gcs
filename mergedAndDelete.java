@@ -1,46 +1,41 @@
 import java.io.*;
 import java.nio.file.*;
-import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 public class FileMerger {
 
-    public static void mergeFiles(String inputDirPath, String outputDirPath, String mergedFilename) throws IOException {
-        // Validate input and output directories
-        Path inputDir = Paths.get(inputDirPath);
-        Path outputDir = Paths.get(outputDirPath);
-
-        if (!Files.isDirectory(inputDir)) {
-            throw new IllegalArgumentException("Input directory does not exist: " + inputDirPath);
+    public static void mergeAndZipFiles(Path inputDir, Path outputDir, String mergedFilename) throws IOException {
+        if (!Files.exists(inputDir) || !Files.isDirectory(inputDir)) {
+            throw new IllegalArgumentException("Input directory does not exist or is not a directory.");
         }
-
+        
         if (!Files.exists(outputDir)) {
             Files.createDirectories(outputDir);
         }
 
-        Path mergedFilePath = outputDir.resolve(mergedFilename);
+        Path mergedFile = outputDir.resolve(mergedFilename);
+        boolean headerAdded = false;
 
-        try (BufferedWriter writer = Files.newBufferedWriter(mergedFilePath)) {
-            boolean headerWritten = false;
-
-            // Process files in the input directory
-            try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(inputDir)) {
-                for (Path filePath : directoryStream) {
-                    if (Files.isRegularFile(filePath)) {
-                        try (BufferedReader reader = Files.newBufferedReader(filePath)) {
+        try (BufferedWriter writer = Files.newBufferedWriter(mergedFile)) {
+            // Iterate through files in the input directory
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(inputDir)) {
+                for (Path file : stream) {
+                    if (Files.isRegularFile(file)) {
+                        try (BufferedReader reader = Files.newBufferedReader(file)) {
                             String line;
                             boolean isFirstLine = true;
                             while ((line = reader.readLine()) != null) {
                                 if (isFirstLine) {
                                     isFirstLine = false;
-                                    if (!headerWritten) {
-                                        writer.write(line);
-                                        writer.newLine();
-                                        headerWritten = true;
+                                    if (headerAdded) {
+                                        continue; // Skip header of subsequent files
+                                    } else {
+                                        headerAdded = true; // Add header from the first file
                                     }
-                                } else {
-                                    writer.write(line);
-                                    writer.newLine();
                                 }
+                                writer.write(line);
+                                writer.newLine();
                             }
                         }
                     }
@@ -48,22 +43,34 @@ public class FileMerger {
             }
         }
 
+        // Zip the merged file
+        Path zipFile = outputDir.resolve(mergedFilename + ".zip");
+        try (ZipOutputStream zipOut = new ZipOutputStream(Files.newOutputStream(zipFile))) {
+            zipOut.putNextEntry(new ZipEntry(mergedFilename));
+            Files.copy(mergedFile, zipOut);
+            zipOut.closeEntry();
+        }
+
         // Delete all files in the input directory
-        try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(inputDir)) {
-            for (Path filePath : directoryStream) {
-                if (Files.isRegularFile(filePath)) {
-                    Files.delete(filePath);
-                }
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(inputDir)) {
+            for (Path file : stream) {
+                Files.deleteIfExists(file);
             }
         }
 
-        System.out.println("Files merged successfully into: " + mergedFilePath);
+        // Optionally, delete the merged file if only the zip is needed
+        Files.deleteIfExists(mergedFile);
     }
 
     public static void main(String[] args) {
         try {
-            mergeFiles("/path/to/inputDir", "/path/to/outputDir", "mergedFile.txt");
-        } catch (IOException e) {
+            Path inputDir = Paths.get("/path/to/input/dir");
+            Path outputDir = Paths.get("/path/to/output/dir");
+            String mergedFilename = "merged_file.txt";
+
+            mergeAndZipFiles(inputDir, outputDir, mergedFilename);
+            System.out.println("Files merged, zipped, and input directory cleared successfully.");
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
