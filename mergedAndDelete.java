@@ -70,3 +70,84 @@ public class FileMerger {
         }
     }
 }
+
+
+
+import java.io.*;
+import java.nio.file.*;
+import java.util.zip.GZIPOutputStream;
+import org.springframework.stereotype.Component;
+
+@Component
+public class FileMerger {
+
+    public void mergeAndZipFiles(Path inputDir, Path outputDir, String mergedFileName) throws IOException {
+        // Clean the output directory
+        cleanDirectory(outputDir);
+
+        // Create the merged file
+        Path mergedFilePath = outputDir.resolve(mergedFileName);
+        try (BufferedWriter writer = Files.newBufferedWriter(mergedFilePath)) {
+            boolean isHeaderWritten = false;
+
+            // Iterate over all files in the input directory
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(inputDir)) {
+                for (Path filePath : stream) {
+                    if (Files.isRegularFile(filePath)) {
+                        try (BufferedReader reader = Files.newBufferedReader(filePath)) {
+                            String line;
+                            boolean isFirstLine = true;
+
+                            while ((line = reader.readLine()) != null) {
+                                if (isFirstLine) {
+                                    // Write header only if not already written
+                                    if (!isHeaderWritten) {
+                                        writer.write(line);
+                                        writer.newLine();
+                                        isHeaderWritten = true;
+                                    }
+                                    isFirstLine = false;
+                                } else {
+                                    writer.write(line);
+                                    writer.newLine();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Zip the merged file
+        Path zipFilePath = outputDir.resolve(mergedFileName + ".gz");
+        try (FileInputStream fis = new FileInputStream(mergedFilePath.toFile());
+             FileOutputStream fos = new FileOutputStream(zipFilePath.toFile());
+             GZIPOutputStream gzipOut = new GZIPOutputStream(fos)) {
+
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) > 0) {
+                gzipOut.write(buffer, 0, bytesRead);
+            }
+        }
+
+        // Delete the merged file after zipping
+        Files.delete(mergedFilePath);
+
+        // Clean the input directory
+        cleanDirectory(inputDir);
+    }
+
+    private void cleanDirectory(Path dir) throws IOException {
+        if (Files.exists(dir)) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+                for (Path filePath : stream) {
+                    Files.deleteIfExists(filePath);
+                }
+            }
+        } else {
+            Files.createDirectories(dir);
+        }
+    }
+}
+
